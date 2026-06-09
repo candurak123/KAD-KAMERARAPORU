@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Digital Camera Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    :root {
+      --black:#0e0e0e; --white:#f5f4f0; --mid:#2a2a2a;
+      --border:#d4d0c8; --muted:#888680; --accent:#c8440a;
+      --surface:#eeecea; --input-bg:#f9f8f5;
+      --mono:'IBM Plex Mono',monospace; --sans:'Inter',sans-serif;
+      --radius:6px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html{font-size:14px;}
+    body{background:var(--white);color:var(--black);font-family:var(--sans);min-height:100vh;}
+
+    .site-header{background:var(--black);color:var(--white);padding:14px 16px 12px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;border-bottom:2px solid var(--accent);}
+    .site-header .logo{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.04em;line-height:1.2;}
+    .site-header .logo span{color:var(--accent);}
+    .site-header .date-tag{font-family:var(--mono);font-size:10px;color:#888;letter-spacing:.06em;}
+
+    .container{max-width:720px;margin:0 auto;padding:16px 12px 60px;}
+
+    .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden;}
+    .card-head{background:var(--black);color:var(--white);font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.1em;padding:7px 14px;display:flex;align-items:center;gap:8px;}
+    .card-head::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+    .card-body{padding:14px;}
+
+    .fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .fields-grid.single{grid-template-columns:1fr;}
+    .field{display:flex;flex-direction:column;gap:4px;}
+    .field label{font-family:var(--mono);font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;}
+    .field input,.field textarea{font-family:var(--sans);font-size:13px;padding:8px 10px;background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--black);width:100%;transition:border-color .15s;-webkit-appearance:none;}
+    .field input:focus,.field textarea:focus{outline:none;border-color:var(--accent);background:#fff;}
+    .field textarea{resize:vertical;min-height:72px;}
+    .fields-gap{display:flex;flex-direction:column;gap:10px;}
+
+    .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .roll-table{width:100%;border-collapse:collapse;min-width:780px;}
+    .roll-table th{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.1em;color:var(--white);background:var(--mid);padding:7px 5px;text-align:left;white-space:nowrap;border-right:1px solid #3a3a3a;}
+    .roll-table th:last-child{border-right:none;}
+    .roll-table td{padding:2px 3px;border-bottom:1px solid var(--border);border-right:1px solid #ece9e3;vertical-align:top;}
+    .roll-table td:last-child{border-right:none;}
+    .roll-table tr:nth-child(even) td{background:var(--surface);}
+    .roll-table tr:hover td{background:#ebe7df;}
+    .roll-table input{font-family:var(--mono);font-size:11px;padding:5px 4px;background:transparent;border:none;color:var(--black);width:100%;min-width:0;}
+    .roll-table input:focus{outline:1px solid var(--accent);border-radius:3px;background:#fff;}
+
+    .combo-wrap{position:relative;}
+    .combo-wrap input{padding-right:18px;}
+    .combo-arrow{position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--muted);pointer-events:none;user-select:none;}
+    .combo-dropdown{position:absolute;top:calc(100% + 2px);left:0;min-width:140%;max-height:200px;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:var(--radius);z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.15);display:none;}
+    .combo-dropdown.open{display:block;}
+    .combo-option{padding:7px 12px;font-family:var(--mono);font-size:11px;color:var(--black);cursor:pointer;white-space:nowrap;border-bottom:1px solid #f0ede8;}
+    .combo-option:last-child{border-bottom:none;}
+    .combo-option:hover{background:var(--surface);color:var(--accent);}
+
+    .add-row-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:10px;padding:9px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted);background:none;border:1px dashed var(--border);border-radius:var(--radius);cursor:pointer;transition:all .15s;}
+    .add-row-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+    .btn{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.06em;padding:12px 10px;border-radius:var(--radius);cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s;-webkit-appearance:none;}
+    .btn-ghost{background:#fff;color:var(--black);border:1px solid var(--border);}
+    .btn-ghost:hover{border-color:var(--black);}
+    .btn-primary{background:var(--accent);color:#fff;}
+    .btn-primary:hover{background:#a83608;}
+    .btn-primary:active{transform:scale(.98);}
+
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--black);color:var(--white);font-family:var(--mono);font-size:12px;letter-spacing:.04em;padding:10px 22px;border-radius:20px;border-left:3px solid var(--accent);opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;z-index:99999;}
+    .toast.show{opacity:1;}
+
+    .site-footer{text-align:center;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.06em;padding:24px 0 8px;}
+
+    @media(max-width:480px){
+      .fields-grid{grid-template-columns:1fr;}
+      .actions{grid-template-columns:1fr;}
+      .site-header .date-tag{display:none;}
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="logo">DCR<span>.</span>APP<br><span style="font-size:9px;color:#666;font-weight:400;">DIGITAL CAMERA REPORT</span></div>
+  <div class="date-tag" id="header-date"></div>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <div class="card-head">PRODUCTION INFO</div>
+    <div class="card-body fields-gap">
+      <div class="fields-grid single"><div class="field"><label>Production</label><input type="text" id="production" placeholder="Prodüksiyon adı"></div></div>
+      <div class="fields-grid single"><div class="field"><label>Film Title</label><input type="text" id="film_title" placeholder="Film adı"></div></div>
+      <div class="fields-grid single"><div class="field"><label>Location</label><input type="text" id="location" placeholder="Çekim yeri"></div></div>
+      <div class="fields-grid">
+        <div class="field"><label>Director</label><input type="text" id="director" placeholder="Yönetmen"></div>
+        <div class="field"><label>DoP</label><input type="text" id="dop" placeholder="Görüntü yönetmeni"></div>
+      </div>
+      <div class="fields-grid">
+        <div class="field"><label>Camera</label><input type="text" id="camera" placeholder="Kamera modeli"></div>
+        <div class="field"><label>Rental House</label><input type="text" id="rental" placeholder="Kiralama"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">CREW</div>
+    <div class="card-body">
+      <div class="fields-grid">
+        <div class="field"><label>Operator</label><input type="text" id="operator" placeholder="Kameraman"></div>
+        <div class="field"><label>Focus Puller</label><input type="text" id="focus" placeholder="Focus puller"></div>
+        <div class="field"><label>2nd A.C.</label><input type="text" id="ac2" placeholder="2. asistan"></div>
+        <div class="field"><label>3nd A.C.</label><input type="text" id="ac3" placeholder="3. asistan"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">ROLL LIST</div>
+    <div class="card-body" style="padding:0;">
+      <div class="table-scroll">
+        <table class="roll-table">
+          <thead>
+            <tr>
+              <th>ROLL</th><th>SCENE</th><th>TAKE</th><th>LENS</th>
+              <th>STOP</th><th>FILTER</th><th>FPS</th><th>ASA</th>
+              <th>WB</th><th>SHUTTER</th><th>NOTE</th>
+            </tr>
+          </thead>
+          <tbody id="roll-body"></tbody>
+        </table>
+      </div>
+      <div style="padding:10px 14px;">
+        <button class="add-row-btn" onclick="addRow()">+ SATIR EKLE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">NOTES</div>
+    <div class="card-body">
+      <div class="field">
+        <textarea id="notes" placeholder="Günün notları, teknik problemler, özel durumlar..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost" onclick="clearForm()">↺ TEMIZLE</button>
+    <button class="btn btn-primary" onclick="exportPDF()">↓ PDF INDIR</button>
+  </div>
+
+  <div class="site-footer">DCR.APP — Digital Camera Report Tool</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const now = new Date();
+document.getElementById('header-date').textContent =
+  now.toLocaleDateString('tr-TR',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}).toUpperCase();
+
+// ── ALEXA 35 — TAM DEĞERLER ──────────────────────────────────────────────
+
+// FPS: Alexa 35 desteklediği tüm project + sensor fps
+const FPS_OPTS = [
+  // Sinema standartları
+  '23.976','24','25','29.97','30',
+  // Yüksek kare hızı
+  '47.952','48','50','59.94','60',
+  // Yavaş çekim (overcrank)
+  '72','75','90','96','100','110','120',
+  // Ekstra yavaş çekim
+  '150','200',
+  // Düşük kare hızı (undercrank)
+  '1','2','3','4','5','6','8','10','12','14.985','15','16','18','20'
+];
+
+// ASA/EI: Alexa 35 EI değerleri (160–6400 native + ES modlar)
+const ASA_OPTS = [
+  '160','200','250','320','400','500','640','800',
+  '1000','1280','1600','2000','2650','3200','6400',
+  '2560ES','3200ES','4800'
+];
+
+// WB: Alexa 35 tam Kelvin aralığı + presetler
+const WB_OPTS = [
+  '2000K','2100K','2200K','2300K','2400K','2500K','2600K','2700K',
+  '2800K','2900K','3000K','3100K','3200K','3300K','3400K','3500K',
+  '3600K','3700K','3800K','3900K','4000K','4100K','4200K','4300K',
+  '4400K','4500K','4600K','4700K','4800K','4900K','5000K','5100K',
+  '5200K','5300K','5400K','5500K','5600K','5700K','5800K','5900K',
+  '6000K','6100K','6200K','6300K','6400K','6500K','6600K','6700K',
+  '6800K','6900K','7000K','7500K','8000K','8500K','9000K','9500K','10000K',
+  '— Presets —',
+  'Tungsten (3200K)','Halogen (3400K)','HMI (5600K)',
+  'Fluorescent Warm (3000K)','Fluorescent Cool (4300K)',
+  'Daylight (5600K)','Overcast (6500K)','Shade (7500K)',
+  'Blue Sky (9000K)','Candlelight (1800K)',
+  'Flash','Custom','Auto'
+];
+
+// SHUTTER: Alexa 35 shutter açı değerleri + 1/x karşılıkları
+const SHUTTER_OPTS = [
+  // Açı değerleri (Alexa 35 desteklediği tam liste)
+  '1°','2°','4°','8°','11.2°','16°','22.5°','32°','45°',
+  '60°','72°','90°','108°','120°','144°','150°','160°',
+  '172.8°','180°','200°','216°','240°','270°','288°',
+  '315°','330°','344°','352°','356°','358°','358.5°',
+  // 1/x süre karşılıkları (@ 24fps referans)
+  '— 1/x Süre —',
+  '1/2000','1/1000','1/750','1/500','1/400','1/300',
+  '1/250','1/200','1/180','1/150','1/125','1/100',
+  '1/96','1/90','1/75','1/60','1/50','1/48',
+  '1/45','1/40','1/32','1/30','1/25','1/24',
+  '1/20','1/16','1/12','1/8','1/6','1/4','1/3','1/2'
+];
+
+function makeCombo(opts, ph, def) {
+  const wrap = document.createElement('div');
+  wrap.className = 'combo-wrap';
+  const inp = document.createElement('input');
+  inp.type='text'; inp.placeholder=ph; inp.value=def||''; inp.autocomplete='off';
+  const arrow = document.createElement('span');
+  arrow.className='combo-arrow'; arrow.textContent='▾';
+  const drop = document.createElement('div');
+  drop.className='combo-dropdown';
+
+  function buildList(f) {
+    drop.innerHTML='';
+    const list = f ? opts.filter(o => !o.startsWith('—') && o.toLowerCase().includes(f.toLowerCase())) : opts;
+    if(!list.length){drop.classList.remove('open');return;}
+    list.forEach(v=>{
+      const d=document.createElement('div');
+      if(v.startsWith('—')){
+        d.style.cssText='padding:4px 12px;font-size:9px;color:#aaa;letter-spacing:.08em;background:#f8f7f4;border-bottom:1px solid #eee;cursor:default;';
+        d.textContent=v;
+      } else {
+        d.className='combo-option'; d.textContent=v;
+        d.onmousedown=e=>{e.preventDefault();inp.value=v;drop.classList.remove('open');};
+      }
+      drop.appendChild(d);
+    });
+  }
+
+  inp.addEventListener('focus',()=>{buildList(inp.value);drop.classList.add('open');});
+  inp.addEventListener('input',()=>{buildList(inp.value);drop.classList.add('open');});
+  inp.addEventListener('blur', ()=>setTimeout(()=>drop.classList.remove('open'),160));
+  arrow.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    drop.classList.contains('open')
+      ? drop.classList.remove('open')
+      : (buildList(''),drop.classList.add('open'),inp.focus());
+  });
+  wrap.appendChild(inp); wrap.appendChild(arrow); wrap.appendChild(drop);
+  return wrap;
+}
+
+// Harf sayacı: A, B, C ... Z, AA, AB ...
+function rollLabel(n) {
+  let label='', num=n;
+  while(num>0){
+    num--;
+    label=String.fromCharCode(65+(num%26))+label;
+    num=Math.floor(num/26);
+  }
+  return label;
+}
+
+function addRow() {
+  const tbody=document.getElementById('roll-body');
+  const n=tbody.querySelectorAll('tr').length+1;
+  const tr=document.createElement('tr');
+  const cols=[
+    {type:'text',   ph:rollLabel(n)},
+    {type:'text',   ph:'1A'},
+    {type:'number', ph:'1'},
+    {type:'text',   ph:'35mm'},
+    {type:'text',   ph:'T2.8'},
+    {type:'text',   ph:'-'},
+    {type:'combo',  opts:FPS_OPTS,     ph:'FPS',     def:'24'},
+    {type:'combo',  opts:ASA_OPTS,     ph:'ASA',     def:'800'},
+    {type:'combo',  opts:WB_OPTS,      ph:'WB',      def:'5600K'},
+    {type:'combo',  opts:SHUTTER_OPTS, ph:'Shutter', def:'180°'},
+    {type:'text',   ph:'Not...'},
+  ];
+  cols.forEach(c=>{
+    const td=document.createElement('td');
+    if(c.type==='combo') td.appendChild(makeCombo(c.opts,c.ph,c.def));
+    else {const i=document.createElement('input');i.type=c.type;i.placeholder=c.ph;td.appendChild(i);}
+    tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+}
+
+for(let i=0;i<15;i++) addRow();
+
+function clearForm(){
+  if(!confirm('Formu tamamen temizlemek istediğinizden emin misiniz?')) return;
+  document.querySelectorAll('#production,#film_title,#location,#director,#dop,#camera,#rental,#operator,#focus,#ac2,#ac3,#notes')
+    .forEach(el=>el.value='');
+  document.getElementById('roll-body').innerHTML='';
+  for(let i=0;i<15;i++) addRow();
+  showToast('Form temizlendi.');
+}
+
+function g(id){return document.getElementById(id)?.value||'';}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+function getTdValue(td){const i=td.querySelector('input');return i?i.value:'';}
+
+function exportPDF(){
+  if(typeof window.jspdf==='undefined'){showToast('PDF kütüphanesi yükleniyor...');setTimeout(exportPDF,900);return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth();
+  const H=doc.internal.pageSize.getHeight();
+  const dateStr=now.toLocaleDateString('tr-TR');
+
+  doc.setFillColor(14,14,14); doc.rect(0,0,W,20,'F');
+  doc.setFillColor(200,68,10); doc.rect(0,18,W,2,'F');
+  doc.setTextColor(245,244,240); doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('DIGITAL CAMERA REPORT',14,13);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text(dateStr,W-14,13,{align:'right'});
+
+  let y=28; doc.setFontSize(8);
+  [['PRODUCTION',g('production'),'FILM TITLE',g('film_title')],
+   ['LOCATION',g('location'),'CAMERA',g('camera')],
+   ['DIRECTOR',g('director'),'DOP',g('dop')],
+   ['RENTAL HOUSE',g('rental'),'','']].forEach(row=>{
+    doc.setFont('helvetica','bold');doc.setTextColor(120,120,120);doc.text(row[0],14,y);
+    doc.setFont('helvetica','normal');doc.setTextColor(14,14,14);doc.text(row[1]||'—',52,y);
+    if(row[2]){doc.setFont('helvetica','bold');doc.setTextColor(120,120,120);doc.text(row[2],W/2+8,y);doc.setFont('helvetica','normal');doc.setTextColor(14,14,14);doc.text(row[3]||'—',W/2+42,y);}
+    y+=6;
+  });
+
+  y+=1; doc.setDrawColor(200,200,200); doc.line(14,y,W-14,y); y+=5;
+  doc.setFont('helvetica','bold');doc.setTextColor(120,120,120);doc.setFontSize(7.5);doc.text('CREW',14,y);y+=4;
+  [['OPERATOR',g('operator'),'FOCUS PULLER',g('focus')],
+   ['2ND A.C.',g('ac2'),'3ND A.C.',g('ac3')]].forEach(row=>{
+    doc.setFont('helvetica','bold');doc.setTextColor(120,120,120);doc.text(row[0],14,y);
+    doc.setFont('helvetica','normal');doc.setTextColor(14,14,14);doc.text(row[1]||'—',52,y);
+    doc.setFont('helvetica','bold');doc.setTextColor(120,120,120);doc.text(row[2],W/2+8,y);
+    doc.setFont('helvetica','normal');doc.setTextColor(14,14,14);doc.text(row[3]||'—',W/2+42,y);
+    y+=5;
+  });
+
+  y+=1; doc.line(14,y,W-14,y); y+=4;
+
+  const rollRows=[];
+  document.querySelectorAll('#roll-body tr').forEach(tr=>{
+    rollRows.push(Array.from(tr.querySelectorAll('td')).map(getTdValue));
+  });
+
+  doc.autoTable({
+    startY:y,
+    head:[['Roll','Scene','Take','Lens','Stop','Filter','FPS','ASA','WB','Shutter','Note']],
+    body:rollRows,
+    margin:{left:14,right:14},
+    styles:{font:'helvetica',fontSize:7,cellPadding:2,textColor:[14,14,14]},
+    headStyles:{fillColor:[42,42,42],textColor:[245,244,240],fontStyle:'bold',fontSize:7},
+    alternateRowStyles:{fillColor:[238,236,232]},
+    tableLineColor:[210,208,200],tableLineWidth:0.1,
+    columnStyles:{10:{cellWidth:28}}
+  });
+
+  const fy=doc.lastAutoTable.finalY+5;
+  const notes=g('notes');
+  if(notes&&fy+10<H-10){
+    doc.setFont('helvetica','bold');doc.setTextColor(120,120,120);doc.setFontSize(7.5);doc.text('NOTES',14,fy);
+    doc.setFont('helvetica','normal');doc.setTextColor(14,14,14);
+    doc.text(doc.splitTextToSize(notes,W-28),14,fy+5);
+  }
+
+  doc.setFontSize(6.5);doc.setTextColor(160,160,160);
+  doc.text('DCR.APP — Digital Camera Report  ·  '+dateStr,W/2,H-5,{align:'center'});
+
+  const title=g('film_title')||'camera_report';
+  doc.save(title.replace(/\s+/g,'_')+'_'+dateStr.replace(/\./g,'-')+'.pdf');
+  showToast('PDF başarıyla indirildi!');
+}
+</script>
+</body>
+</html>
